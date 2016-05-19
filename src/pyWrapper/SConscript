@@ -1,0 +1,18 @@
+Import('env')
+
+env.Append(CXXFLAGS=["-fPIC"])
+
+env.Append(CPPPATH=["/usr/local/Cellar/python/2.7.11/Frameworks/Python.framework/Versions/2.7/include/python2.7/"])
+env.Append(LIBPATH=['/usr/local/Cellar/python/2.7.11/Frameworks/Python.framework/Versions/2.7/lib/'])
+#env.Append(CPPPATH=['/usr/include/python2.7'])
+env.Append(LIBS=['python2.7', 'boost_python'])
+env['SHLIBPREFIX'] = ''
+env.SharedLibrary("eps_scan.so", Split("""ScanAlgorithms.cpp
+				 ../algorithms/old/dataset.c
+                             ../algorithms/old/function.c
+                             ../algorithms/old/interval.c
+                             ../algorithms/old/mtint.c
+                             ../algorithms/old/sort.c
+			     ../algorithms/Point.cpp
+                             ../algorithms/Region.cpp
+			     ../algorithms/Utility.cpp"""))

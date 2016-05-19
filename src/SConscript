@@ -1,0 +1,2 @@
+Import('env')
+env.SConscript('pyWrapper/SConscript', {'env' : env})
