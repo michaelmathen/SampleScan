@@ -31,6 +31,7 @@ import random
 #Generate a list of random points with random anomalies
 pts = [eps_scan.Point(random.random(), random.random(), bool(random.randint(0, 1))) for i in xrange(1000)]
 #Run the algorith with a net size of 100 and a sample size of 1000 and print the found region.
-print eps_scan.netDisk2(pts, 100, 1000)
+#The last parameter prevents us from considering regions that are too large or small since the approximation breaks down there.
+print eps_scan.netDisk2(pts, 100, 1000, .01)
 ```
 
