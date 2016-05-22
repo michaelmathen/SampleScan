@@ -24,5 +24,13 @@ You should then be able to use this library as a standard python module by doing
 import eps_scan
 
 # Calling eps scan 
-
+Example code:
+```
+import eps_scan
+import random
+#Generate a list of random points with random anomalies
+pts = [eps_scan.Point(random.random(), random.random(), bool(random.randint(0, 1))) for i in xrange(1000)]
+#Run the algorith with a net size of 100 and a sample size of 1000 and print the found region.
+print eps_scan.netDisk2(pts, 100, 1000)
+```
 
