@@ -2,10 +2,13 @@ import os
 # Let's define a common build environment first...
 common_env = Environment()
 common_env.Append(CPPDEFINES={'VERSION': 1})
-common_env.Append(CXXFLAGS=['-std=c++11'])
+common_env.Append(CXXFLAGS=['-std=c++11', '-fopenmp'])
 common_env.Append(LIBPATH=['/usr/local/lib/', '/home/mmath/lib'])
 common_env.Append(CPPPATH=["/usr/local/include", '/home/mmath/include'])
 common_env.Append(CPPPATH=["/usr/include/python2.7"])
+#common_env.Append( F90FLAGS  = ' -openmp' )
+common_env.Append( LINKFLAGS = ' -fopenmp' )
+
 parent_dir = os.getcwd()
 
 release_env = common_env.Clone()
