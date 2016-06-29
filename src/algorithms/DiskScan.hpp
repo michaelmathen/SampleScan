@@ -454,6 +454,122 @@ namespace anomaly {
     }
   };
 
+  struct SatScan {
+    template <typename RI>
+    Disk operator()(RI nB, RI nE) {
+      return run(nB, nE);
+    }
+
+    template <typename RI>
+    Disk run(RI nB, RI nE) {
+      Disk currMax;
+      currMax.setNumPoints(0, 0);
+      currMax.setNumAnomalies(0, 0);
+      vector<Point> sortedPoints(nB, nE);
+      auto totalMeasuredCount = count_if(nB, nE, [](Point const& pt) {
+	  return pt.getLabel();
+	});
+      for (auto i = nB; i != nE - 1; i++) {
+	for (auto j = i + 1; j != nE; j++) {
+	  //Create a vector between the two points
+	  double orthoX, orthoY;
+	  findPerpVect(*i, *j, &orthoX, &orthoY);
+	  double cX = (i->getX() + j->getX()) / 2.0;
+	  double cY = (i->getY() + j->getY()) / 2.0;
+	  
+	  auto isNotCol = [&i, &j](Point const& pt) {
+	    return !colinear(*i, *j, pt);
+	  };
+	  
+	  // Partition these into a set of adding points and removing points
+	  auto partitionF = [orthoX, orthoY, cX, cY](Point const& pt) {
+	    return (pt.getX() - cX) * orthoX + (pt.getY() - cY) * orthoY <= 0;
+	  };
+	  
+	  auto orderF = [orthoX, orthoY, &i, &j, cX, cY](Point const& pt) {
+	    // If the point lines up with either of the reference
+	    // point then we take this to be a disk defined by only
+	    // the reference points.
+	    if (colinear(*i, *j, pt)){
+	      return numeric_limits<double>::infinity();
+	    } else {
+	      // We are projecting a vector created between
+	      //the disk center and center point between the two points.
+	      double a, b;
+	      solveCircle3(*i, *j, pt, a, b);
+	      return orthoX * (a - cX) + orthoY * (b - cY);
+	    }
+	  };
+	  
+	  auto compF = [&orderF] (Point const& pt1, Point const& pt2) {
+	    return orderF(pt1) < orderF(pt2);
+	  };
+	  auto onLine = [i, j](Point const& pt) {
+	    return onLineSegment(*i, *j, pt);
+	  };
+	  
+	  auto iterEnd = partition(sortedPoints.begin(), sortedPoints.end(), isNotCol);
+
+	  auto measuredOnLine = count_if(iterEnd, sortedPoints.end(), [&onLine](Point const& pt) {
+	      return pt.getLabel() && onLine(pt);
+	    });
+	  auto baseOnLine = count_if(iterEnd, sortedPoints.end(), [&onLine](Point const& pt) {
+	      return onLine(pt);
+	    });
+
+	  auto higherIt = partition(sortedPoints.begin(), iterEnd, partitionF);
+	  sort(sortedPoints.begin(), higherIt, compF);
+	  sort(higherIt, iterEnd, compF);
+	  
+	  auto aCount = count_if(sortedPoints.begin(), higherIt, [](Point const& pt) {
+	      return pt.getLabel();
+	    });
+	  auto bCount = higherIt - sortedPoints.begin();
+	  auto remov = sortedPoints.begin(), add = higherIt;
+	  
+	  while (true) {
+	    decltype(i) k;
+	    if (add == iterEnd && remov == higherIt) {
+	      break;
+	    } else if (add == iterEnd) {
+	      k = remov;
+	    } else if (remov == higherIt) {
+	      k = add;
+	    } else if (orderF(*add) < orderF(*remov)) {
+	      k = add;
+	    } else {
+	      k = remov;
+	    }
+	    Disk currDisk(*i, *j, *k);
+	    currDisk.setNumAnomalies(aCount + measuredOnLine, totalMeasuredCount);
+	    currDisk.setNumPoints(bCount + baseOnLine, sortedPoints.size());
+	    if (currMax.statistic() <= currDisk.statistic()) {
+	      currMax = currDisk;
+	    }
+	    
+	    if (add == iterEnd) {
+	      aCount -= add->getLabel();
+	      bCount--;
+	      remov++;
+	    } else if (remov == higherIt) {
+	      aCount += add->getLabel();
+	      bCount++;
+	      add++;
+	    } else if (orderF(*add) < orderF(*remov)) {
+	      aCount += add->getLabel();
+	      bCount++;
+	      add++;
+	    } else {
+	      aCount -= add->getLabel();
+	      bCount--;
+	      remov++;
+	    }
+	  }
+	}
+      }
+      return currMax;
+    }
+  };
 
 }
 

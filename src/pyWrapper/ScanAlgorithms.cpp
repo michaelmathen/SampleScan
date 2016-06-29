@@ -39,6 +39,16 @@ boost::python::object runAlg(boost::python::object const& ob, Ss ...args) {
   return boost::python::object(alg(begin, end, args...));
 }
 
+boost::python::object runSatScan(boost::python::object const& ob) {
+  boost::python::stl_input_iterator<anomaly::Point> begin(ob), end;
+  if (begin == end) {
+    return boost::python::object();
+  }
+  std::vector<anomaly::Point> pts(begin, end);
+  anomaly::SatScan alg;
+  return boost::python::object(alg(pts.begin(), pts.end()));
+}
+
 
 template <typename T>
 boost::python::object runAlgSample(boost::python::object const& n,
@@ -138,14 +148,19 @@ BOOST_PYTHON_MODULE(eps_scan)
   def("disk3", &disk3);
   
   def("netDisks", runAlg<anomaly::AllDisks, int, int, double>);
-  def("netRects", runAlg<anomaly::RectangleScan, int, int, double>);
+  //def("netRects", runAlg<anomaly::RectangleScan, int, int, double>);
+  def("netRectsGrid", runAlg<anomaly::RectangleScanG, int, int, double>);
+  def("netRectsEGrid", runAlg<anomaly::RectangleScanGH, int, int, double>);    
   def("netDisks2", runAlg<anomaly::MoreDisks, int, int, double>);
   def("netCDisks", runAlg<anomaly::CenterNetDisks, int, int, double>);
   def("cDisks", runAlg<anomaly::CenteredDisks, int, double>);
   def("scanRects", runJeff);
-
+  def("satScan", runSatScan);
+  
   def("netDisksSample", runAlgSample<anomaly::AllDisks>);
-  def("netRectsSample", runAlgSample<anomaly::RectangleScan>);
+  //def("netRectsSample", runAlgSample<anomaly::RectangleScan>);
+  def("netRectsGSample", runAlgSample<anomaly::RectangleScanG>);
+  def("netRectsEGSample", runAlgSample<anomaly::RectangleScanGH>);
   def("netDisks2Sample", runAlgSample<anomaly::MoreDisks>);
   def("netCDisksSample", runAlgSample<anomaly::CenterNetDisks>);
   def("cDisksSample", runAlgSampleC);

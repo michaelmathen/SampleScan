@@ -1,6 +1,6 @@
 #ifndef RECT_SCAN
 #define RECT_SCAN
-
+#include <omp.h>
 #include <map>
 #include "Region.hpp"
 
@@ -9,80 +9,77 @@
 //#include "OrthoCount.hpp"
 
 namespace anomaly {
-  struct RectangleScan {
 
-    template <typename T, typename Struct>
-    auto less_or_equal(T key, Struct& el) -> decltype(el.begin()) {
-      auto lb = el.lower_bound(key);
-      return lb->first == key ? lb : --lb;
+  template<typename T>
+  struct Grid {
+    using size_type = typename vector<T>::size_type;
+    vector<T> grid;
+    size_type n;
+    Grid(size_type n) : grid(n * n, 0), n(n) {
+      grid.resize(n * n);
     }
+    T& operator()(size_type i, size_type j) {
+      return grid[i * n + j];
+    }
+    T const& operator()(size_type i, size_type j) const {
+      return grid[i * n + j];
+    }
+    size_type size() const {
+      return n;
+    }
+  };
 
-    /*
-      We assume that all containers are sorted by y axis.
-     */
-    template <typename RI>
-    vector<vector<double>> generateStrips(RI begin, RI end,
-					  RI sBegin, RI sEnd) {
-      vector<vector<double>> strips(end - begin - 1, vector<double>());
-      auto curr_strip = strips.begin();
-      auto sb = sBegin;
-      //Find the begining of the first point
-      for (;sb != sEnd && sb->getY() < begin->getY(); sb++);
-      //Do all the elements between.
-      for (auto i = begin + 1; i != end; ++i) {
-	for (; sb != sEnd && sb->getY() < i->getY(); ++sb) {
-	  curr_strip->push_back(sb->getX());
-	}
-	sort(curr_strip->begin(), curr_strip->end());
-	++curr_strip;
-      }
-      return strips;
-    }
-
-    void insertNode(Point const& pt, map<double, vector<double>>& nodes) {
-      //Splits the preceading node in the heap from the current node we are inserting.
-      auto lb = nodes.lower_bound(pt.getX());
-      if (lb == nodes.end() || lb->first != pt.getX()) {
-	lb--;
-	auto unaryF = [&pt](double el) {
-	  return el < pt.getX();
-	};
-	auto elsAfterPart = partition(lb->second.begin(), lb->second.end(), unaryF);
-	if (lb->second.end() - elsAfterPart > 0) {
-	  nodes.insert(make_pair(pt.getX(), vector<double>(elsAfterPart, lb->second.end())));
-	  lb->second.erase(elsAfterPart);
-       } else {
-	  nodes.insert(make_pair(pt.getX(), vector<double>()));
-       }
-      }
-    }
-
-    template <typename T>
-    void updateNodes(T b, T e, map<double, vector<double>>& nodes) {
-      // We run through all the nodes before the last one.
-      auto nI = ++nodes.begin();
-      auto nIB = nodes.begin();
-      for (; nI != nodes.end(); ++nI) {
-	for (; b != e && *b < nI->first; ++b) {
-	  nIB->second.push_back(*b);
-	}
-	nIB++;
-      }
-      // Now we finish with the last node
-      for (; b != e; ++b) {
-	nIB->second.push_back(*b);
-      }
-    }
-
-    template<typename T>
-    int sumBox(T l_it, T r_it) {
-      int count = 0;
-      for (;l_it != r_it; ++l_it) {
-	count += l_it->second.size();
-      }
-      return count;
-    }
+  template<typename P, typename RI>
+  inline void fillGrid(P bx, P ex, P by, P ey, Grid<int>& counts, RI begin, RI end) {
+    auto cmpX = [](Point const& pt1, Point const& pt2) {
+      return pt1.getX() < pt2.getX();
+    };
+    auto cmpY = [](Point const& pt1, Point const& pt2) {
+      return pt1.getY() < pt2.getY();
+    };
     
+    sort(begin, end, cmpX);
+    // Divide the points in the x direction into strips
+    // then sort each strip in the y direction.
+    // Could be slightly sped up by splitting instead of sorting as this
+    // will change from s * log(s) + s/n log(s/n) to s * log(n) + s/n * log(n)
+    for (int i = 0; bx != ex; ++bx, ++i) { // for each strip
+      auto e = find_if(begin, end, [&bx](Point const& el) {
+	  return *bx < el.getX(); // Get the first element larger than this.
+	});
+      sort(begin, e, cmpY);
+      int j = 0;
+      for (auto tmpy = by; tmpy != ey; ++tmpy, ++j) { // for each grid cell
+	while (begin->getY() <= *tmpy && begin != e) { // For each point.
+	  counts(i, j) += 1;
+	  begin++;
+	}
+      }
+    }
+    // Compute cummalative sums in the x direction
+    for (int i = 1; i < counts.size(); i++) {
+      for (int j = 0; j < counts.size(); j++) {
+	counts(i, j) += counts(i - 1, j);	
+      }
+    }
+    // Compute cummalative sums in the y direction
+    for (int i = 0; i < counts.size(); i++) {    
+      for (int j = 1; j < counts.size(); j++) {    
+	counts(i, j) += counts(i, j - 1);
+      }
+    }
+
+  }
+
+  /*
+    Calculates the grid cell by subtracting the appropriate cummulative sums
+  */
+  template<typename T>
+  T computeCell(Grid<T> const& g, int ux, int uy, int lx, int ly) {
+    return g(ux, uy) + g(lx, ly) - g(lx, uy) - g(ux, ly);
+  }
+
+  struct RectangleScanG {
     template <typename RI>
     Rectangle operator()(RI nB, RI nE,
 			 int netSize,
@@ -95,111 +92,188 @@ namespace anomaly {
       return run(netS.begin(), netS.end(), aS.begin(), aS.end(), bS.begin(), bS.end(), rho);
     }
 
-
+    bool smaller(Rectangle r1, Rectangle r2) {
+      return (r1.getUX() - r1.getLX()) * (r1.getUY() - r1.getLY()) > (r2.getUX() - r2.getLX()) * (r2.getUY() - r2.getLY());
+    }
     /*
-      This should run in roughly O(slogs + ns + n^4) time.
+      This should run in roughly O(s logs + n^4) time.
      */
-    using node_t = tuple<vector<Point*>, vector<Point*>>;
     template <typename RI>
     Rectangle run(RI begin, RI end,
 		  RI asBegin, RI asEnd,
 		  RI bsBegin, RI bsEnd,
 		  double rho) {
-      auto cmpX = [](Point const& pt1, Point const& pt2) {
-	return pt1.getX() < pt2.getX();
-      };
-      
-      auto cmpY = [](Point const& pt1, Point const& pt2) {
-	return pt1.getY() < pt2.getY();
-      };
-      sort(begin, end, cmpY);
-      sort(asBegin, asEnd, cmpY);
-      sort(bsBegin, bsEnd, cmpY);
 
-      //At the end of this part we have each 2n strips where each strip is sorted by x axis
-      auto aStrips = generateStrips(begin, end, asBegin, asEnd);
-      auto bStrips = generateStrips(begin, end, bsBegin, bsEnd);
+      auto g = end - begin;
+      vector<double> x_pos(g);
+      vector<double> y_pos(g);      
+      Grid<int> anomalies(g);
+      Grid<int> baseline(g);
+      int it = 0;
+      for (auto b = begin; b != end; b++) {
+	x_pos[it] = b->getX();
+	y_pos[it] = b->getY();
+	it++;
+      }
+      sort(x_pos.begin(), x_pos.end());
+      sort(y_pos.begin(), y_pos.end());
+
+      fillGrid(x_pos.begin(), x_pos.end(), y_pos.begin(), y_pos.end(),
+	       anomalies, asBegin, asEnd);
+      fillGrid(x_pos.begin(), x_pos.end(), y_pos.begin(), y_pos.end(),
+	       baseline, bsBegin, bsEnd);
+
+      const int aTotal = asEnd - asBegin;
+      const int bTotal = bsEnd - bsBegin;
+      const double eps = 2.0 / static_cast<double>(end - begin);
+      const int num_threads = omp_get_max_threads();
+      Rectangle rects[num_threads];
+      #pragma omp parallel
+      {
+	int id = omp_get_thread_num();
+	Rectangle maxRect;
+	maxRect.setNumAnomalies(0, 0);
+	maxRect.setNumPoints(0, 0);
+	double maxScan = 0;
+        #pragma omp for 
+	for (int i = 0; i < g - 1; i++) { // left
+	  for (int j = 0; j < g - 1; j++) { // top
+	    for (int k = i + 1; k < g; k++) { // right
+	      for (int m = j + 1; m < g; m++) { // bottom
+		int aCount = computeCell(anomalies, i, j, k, m);
+		int bCount = computeCell(baseline, i, j, k, m);
+		double mr = (double) aCount / aTotal;
+		double br = (double) bCount / bTotal;
+		if (rhoInRange(mr, br, rho, eps)) {
+		  Rectangle rect(x_pos[i], x_pos[k], y_pos[j], y_pos[m]);
+		  rect.setNumAnomalies(aCount, aTotal);
+		  rect.setNumPoints(bCount, bTotal);
+		  double newSt = rect.statistic();
+		  if (newSt > maxScan) {
+		    maxRect = rect;
+		    maxScan = newSt;
+		  } else if (newSt == maxScan && smaller(maxRect, rect)) {
+		    maxRect = rect;
+		    maxScan = newSt;
+		  }
+		}
+	      }
+	    }
+	  }
+	}
+	//return maxRect;
+	rects[id] = maxRect;
+      }
+      Rectangle rect = rects[0];
+      for (int i = 1; i < num_threads; i++) {
+       	if (rects[i].statistic() > rect.statistic()) {
+       	  rect = rects[i];
+       	}
+      }
+      return rect;
+    }
+  };
+
+  /*
+    Try to figure out the maximum possible value that could occur if we continue.
+   */
+  inline double maxSub(double mr, double br, double eps, double rho) {
+    rho = rho + eps;
+    double alpha = exp(- 1 / rho) + eps;
+    mr = min(1 - alpha, mr);
+    br = min(1 - rho, br);
+    mr = max(mr, alpha);
+    br = max(br, rho);
+
+    //Largest point occurs in one of the corners of (alpha, br), (mr, br),
+    //(alpha, rho), (mr, rho)
+    return max({alpha * log(alpha / br) + (1 - alpha) * log((1 - alpha) / (1 - br)),
+	  alpha * log(alpha / rho) + (1 - alpha) * log((1 - alpha) / (1 - rho)),
+	  mr * log(mr / rho) + (1 - rho) * log((1 - mr) / (1 - rho)),
+	  mr * log(mr / br) + (1 - mr) * log((1 - mr) / (1 - br))});
+  }
+  
+  struct RectangleScanGH {
+    template <typename RI>
+    Rectangle operator()(RI nB, RI nE,
+			 int netSize,
+			 int sampleSize,
+			 double rho) {
+      vector<Point> netS;
+      vector<Point> aS;
+      vector<Point> bS;    
+      dualSample(nB, nE, netS, aS, bS, netSize, sampleSize);
+      return run(netS.begin(), netS.end(), aS.begin(), aS.end(), bS.begin(), bS.end(), rho);
+    }
+
+    /*
+      This should run in roughly O(slogs + ns + n^4) time.
+     */
+    template <typename RI>
+    Rectangle run(RI begin, RI end,
+		  RI asBegin, RI asEnd,
+		  RI bsBegin, RI bsEnd,
+		  double rho) {
+
+      auto g = end - begin;
+      vector<double> x_pos(g);
+      vector<double> y_pos(g);      
+      Grid<int> anomalies(g);
+      Grid<int> baseline(g);
+      int it = 0;
+      for (auto b = begin; b != end; b++) {
+	x_pos[it] = b->getX();
+	y_pos[it] = b->getY();
+	it++;
+      }
+      sort(x_pos.begin(), x_pos.end());
+      sort(y_pos.begin(), y_pos.end());
+
+      fillGrid(x_pos.begin(), x_pos.end(), y_pos.begin(), y_pos.end(),
+	       anomalies, asBegin, asEnd);
+      fillGrid(x_pos.begin(), x_pos.end(), y_pos.begin(), y_pos.end(),
+	       baseline, bsBegin, bsEnd);
 
       Rectangle maxRect;
       maxRect.setNumAnomalies(0, 0);
       maxRect.setNumPoints(0, 0);
-      double maxScan = maxRect.statistic();
-      auto ai = aStrips.begin();
-      auto bi = bStrips.begin();
-      for (auto i = begin;i != end - 1; ai++, bi++, i++) {
-	map<double, vector<double>> aNodes;
-	map<double, vector<double>> bNodes;
-	aNodes.insert(make_pair(-numeric_limits<double>::infinity(), vector<double>()));
-	bNodes.insert(make_pair(-numeric_limits<double>::infinity(), vector<double>()));
-	insertNode(*i, aNodes);
-	insertNode(*i, bNodes);
-	auto aj = ai;
-	auto bj = bi;
-	for (auto j = i + 1; j != end; aj++, bj++, j++) {
-	  insertNode(*j, aNodes);
-	  insertNode(*j, bNodes);
-	  updateNodes(aj->begin(), aj->end(), aNodes);
-	  updateNodes(bj->begin(), bj->end(), bNodes);
+      int aTotal = asEnd - asBegin;
+      int bTotal = bsEnd - bsBegin;
+      double eps = 1.0 / static_cast<double>(end - begin);
+      double maxScan = 0;
+      auto earlyTerm = [&anomalies, &baseline,
+			eps, rho,
+			aTotal, bTotal](int i, int j,
+					int k, int m,
+					double ms) {
+      	int aCount = computeCell(anomalies, i, j, k, m);
+	int bCount = computeCell(baseline, i, j, k, m);
+	double mr = (double) aCount / aTotal;
+	double br = (double) bCount / bTotal;
+	return ms < maxSub(mr, br, eps, rho);
+      };
 
-	  double left_pt = i->getX() < j->getX() ? i->getX() : j->getX();
-	  double right_pt = i->getX() >= j->getX() ? i->getX() : j->getX();
-
-	  auto l_itA = aNodes.lower_bound(left_pt);
-	  auto r_itA = aNodes.lower_bound(right_pt);
-	  auto l_itB = bNodes.lower_bound(left_pt);
-	  auto r_itB = bNodes.lower_bound(right_pt);
-	  int aCount = sumBox(l_itA, r_itA);
-	  int bCount = sumBox(l_itB, r_itB);
-	  #ifdef DEBUG
-	  cout << "bottom left = " << left_pt << " " << i->getY() << endl;
-	  cout << "top right side = " << right_pt << " " << j->getY() << endl;
-	  cout << "aCount = " << aCount << endl;
-	  cout << "bCount = " << bCount << endl;
-	  #endif
-
-	  // Now we can iterate over every rectangle that has *i and *j as its upper and lower
-	  // elements respectively
-	  // We could do every pair, but that would overcount the rectangles so we actually want
-	  // to do every pair that lies outside of i->getX() and j->getX().
-	  // ---------------*i--------------------------
-	  //                      3         
-	  // 1        2
-	  //                                     4
-	  //-----------------------------*j-------------
-	  //So above we do rectangles (1, 4, *i, *j) and (2, 4, *i, *j), but not (2, 3, *i, *j)
-	  //Now we compute all rectangles defined by 3 and 4 points.
-
-	  do {
-	    int aCount_tmp = aCount;
-	    int bCount_tmp = bCount;
-	    auto ra = r_itA;
-	    auto rb = r_itB;
-	    do {
-	      double b_hat = bCount_tmp / static_cast<double>(bsEnd - bsBegin);
-	      double a_hat = aCount_tmp / static_cast<double>(asEnd - asBegin);
-	      //This is not conservative at all
-	      double eps = 2 / static_cast<double>(end - begin);
-	      if (rhoInRange(a_hat, b_hat, rho, eps)) {
-		Rectangle rect(l_itA->first, ra->first, i->getY(), j->getY());
-		rect.setNumAnomalies(aCount_tmp, asEnd - asBegin);
-		rect.setNumPoints(bCount_tmp, bsEnd - bsBegin);
+      for (int i = 0; i < g - 1 && earlyTerm(i, 0, g - 1, g - 1, maxScan); i++) { // left
+	for (int j = 0; j < g - 1 && earlyTerm(i, j, g - 1, g - 1, maxScan); j++) { // top
+	  for (int k = g - 1; k > i && earlyTerm(i, j, k, g - 1, maxScan); k--) { // right
+	    for (int m = g - 1; m > j && earlyTerm(i, j, k, m, maxScan); m--) { // bottom
+	      int aCount = computeCell(anomalies, i, j, k, m);
+	      int bCount = computeCell(baseline, i, j, k, m);
+	      double mr = (double) aCount / aTotal;
+	      double br = (double) bCount / bTotal;
+	      if (rhoInRange(mr, br, rho, eps)) {
+		Rectangle rect(x_pos[i], x_pos[k], y_pos[j], y_pos[m]);
+		rect.setNumAnomalies(aCount, aTotal);
+		rect.setNumPoints(bCount, bTotal);
 		double newSt = rect.statistic();
 		if (newSt >= maxScan) {
 		  maxRect = rect;
 		  maxScan = newSt;
 		}
 	      }
-	      aCount_tmp += ra->second.size();
-	      bCount_tmp += rb->second.size();
-	      ra++;
-	      rb++;
-	    } while (ra != aNodes.end());
-	    l_itA--;
-	    l_itB--;
-	    aCount += l_itA->second.size();
-	    bCount += l_itB->second.size();
-	  } while (l_itA != aNodes.begin());
-	} 
+	    }
+	  }
+	}
       }
       return maxRect;
     }
