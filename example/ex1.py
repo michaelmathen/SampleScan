@@ -9,9 +9,9 @@ st =  time.time()
 print eps_scan.netDisks(pts, 100, 4000, .01)
 en = time.time()
 print(en - st)
-
-
+"""
 st =  time.time()
 print eps_scan.netDisks2(pts, 100, 4000, .01)
 en = time.time()
 print(en - st)
+"""

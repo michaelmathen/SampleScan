@@ -54,8 +54,15 @@ namespace anomaly {
       vector<int> bCountsA(nEnd - nBegin, 0);
       vector<int> aCountsR(nEnd - nBegin, 0);
       vector<int> bCountsR(nEnd - nBegin, 0);
-      for (auto i = nBegin; i != nEnd - 1; i++) {
-	for (auto j = i + 1; j != nEnd; j++) {
+      auto sortedB = netSampleSorted.begin();
+      auto sortedEOuter = netSampleSorted.end();
+      for (auto i = nBegin; i != nEnd - 2; i++) {
+	sortedEOuter = remove(sortedB, sortedEOuter, *i);
+	auto sortedE = sortedEOuter;
+	for (auto j = i + 1; j != nEnd - 1; j++) {
+	  auto el = find(sortedB, sortedE, *j);
+	  swap(*el, *(sortedE - 1));
+	  sortedE = sortedE - 1;
 	  //Create a vector between the two points
 	  double orthoX, orthoY;
 	  findPerpVect(*i, *j, &orthoX, &orthoY);
@@ -98,7 +105,7 @@ namespace anomaly {
 	  auto bsIterEnd = partition(bsBegin, bsEnd, isNotCol);
 	  auto aCount = count_if(asIterEnd, asEnd, onLine);
 	  auto bCount = count_if(bsIterEnd, bsEnd, onLine);
-	  auto nIterEnd = partition(netSampleSorted.begin(), netSampleSorted.end(), isNotCol);
+	  auto nIterEnd = partition(sortedB, sortedE, isNotCol);
 	  sort(netSampleSorted.begin(), nIterEnd, compF);
 	  auto aHigherIt = partition(asBegin, asIterEnd, partitionF);
 	  auto bHigherIt = partition(bsBegin, bsIterEnd, partitionF);
@@ -109,22 +116,22 @@ namespace anomaly {
 	  fill(bCountsA.begin(), bCountsA.end(), 0);
 	  /*Probably most of the time is spent here*/
 	  partial_counts(asBegin, aHigherIt,
-			 netSampleSorted.begin(), nIterEnd,
+			 sortedB, nIterEnd,
 			 aCountsR, compF);
 	  aCount = aHigherIt - asBegin + aCount;
 	  partial_counts(bsBegin, bHigherIt,
-			 netSampleSorted.begin(), nIterEnd,
+			 sortedB, nIterEnd,
 			 bCountsR, compF);
 	  bCount = bHigherIt - bsBegin + bCount;
 	  partial_counts(aHigherIt, asIterEnd,
-			 netSampleSorted.begin(), nIterEnd,
+			 sortedB, nIterEnd,
 			 aCountsA, compF);
 	  partial_counts(bHigherIt, bsIterEnd,
-			 netSampleSorted.begin(), nIterEnd,
+			 sortedB, nIterEnd,
 			 bCountsA, compF);
 	  /*----------------------------------------------*/
 	  
-	  auto size = nIterEnd - netSampleSorted.begin();
+	  auto size = nIterEnd - sortedB;
 	  for (int k = 0; k < size; k++) {
 	    aCount += aCountsA[k] - aCountsR[k];
 	    bCount += bCountsA[k] - bCountsR[k];	    
@@ -132,7 +139,7 @@ namespace anomaly {
 	    double a_hat = aCount / static_cast<double>(asEnd - asBegin);
 	    
 	    //This is not conservative at all
-	    Disk currDisk(*i, *j, netSampleSorted[k]);
+	    Disk currDisk(*i, *j, *(sortedB + k));
 	    currDisk.setNumAnomalies(aCount, asEnd - asBegin);
 	    currDisk.setNumPoints(bCount, bsEnd - bsBegin);
 	    if (currMax.statistic() <= currDisk.statistic()) {

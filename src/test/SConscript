@@ -1,0 +1,13 @@
+Import('env')
+
+#env.Append(CXXFLAGS=["-fPIC"])
+
+env.Program("benchmarking", Split("""diskrun.cpp
+				 ../algorithms/old/dataset.c
+                             ../algorithms/old/function.c
+                             ../algorithms/old/interval.c
+                             ../algorithms/old/mtint.c
+                             ../algorithms/old/sort.c
+			     ../algorithms/Point.cpp
+                             ../algorithms/Region.cpp
+			     ../algorithms/Utility.cpp"""))
