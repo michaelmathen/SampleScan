@@ -1,10 +1,8 @@
 #ifndef ANOMALY_REGION_SCAN
 #define ANOMALY_REGION_SCAN
 #include <vector>
-
 #include "Region.hpp"
 #include "Point.hpp"
-
 #include "Utility.hpp"
 
 namespace anomaly {
@@ -19,20 +17,22 @@ namespace anomaly {
     Disk operator()(RI nB, RI nE,
 		    int netSize,
 		    int sampleSize,
+		    double sigLevel,
 		    double rho) {
       vector<Point> netS;
       vector<Point> aS;
       vector<Point> bS;    
       dualSample(nB, nE, netS, aS, bS, netSize, sampleSize);
-      return run(netS.begin(), netS.end(), aS.begin(), aS.end(), bS.begin(), bS.end(), rho);
+      return run(netS.begin(), netS.end(), aS.begin(), aS.end(), bS.begin(), bS.end(), sigLevel, rho);
     }
     
     template <typename RI>
     Disk run(RI nB, RI nE,
 	     RI asBegin, RI asEnd,
 	     RI bsBegin, RI bsEnd,
+	     double sigLevel, //Return any item over this significance level
 	     double rho) {
-      
+
       //Remove any duplicates.
       sort(nB, nE, [](Point const& pt1, Point const& pt2) {
 	  return norm(pt1) < norm(pt2);
@@ -47,7 +47,10 @@ namespace anomaly {
       Disk currMax;
       currMax.setNumPoints(0, 0);
       currMax.setNumAnomalies(0, 0);
-      
+      vector<int> aCountsA(nEnd - nBegin, 0);
+      vector<int> bCountsA(nEnd - nBegin, 0);
+      vector<int> aCountsR(nEnd - nBegin, 0);
+      vector<int> bCountsR(nEnd - nBegin, 0);
       for (auto i = nBegin; i != nEnd - 1; i++) {
 	for (auto j = i + 1; j != nEnd; j++) {
 	  //Create a vector between the two points
@@ -78,6 +81,7 @@ namespace anomaly {
 	      solveCircle3(*i, *j, pt, a, b);
 	      return orthoX * (a - cX) + orthoY * (b - cY);
 	    }
+	    
 	  };
 	  
 	  auto compF = [&orderF] (Point const& pt1, Point const& pt2) {
@@ -94,28 +98,40 @@ namespace anomaly {
 	  auto nIterEnd = partition(netSampleSorted.begin(), netSampleSorted.end(), isNotCol);
 	  sort(netSampleSorted.begin(), nIterEnd, compF);
 	  auto aHigherIt = partition(asBegin, asIterEnd, partitionF);
-	  sort(asBegin, aHigherIt, compF);
-	  sort(aHigherIt, asIterEnd, compF);
 	  auto bHigherIt = partition(bsBegin, bsIterEnd, partitionF);
-	  sort(bsBegin, bHigherIt, compF);
-	  sort(bHigherIt, bsIterEnd, compF);
-	  auto aRemov = asBegin, aAdd = aHigherIt;
-	  auto bRemov = bsBegin, bAdd = bHigherIt;
-	  for (auto k = netSampleSorted.begin(); k != nIterEnd; k++) {
-	    auto dO = orderF(*k);
-	    //Now shift the disk in the approx sample till it falls inside
-	    for (; aRemov != aHigherIt && orderF(*aRemov) < dO; ++aRemov); // keep aRemov inside the disk
-	    for (; bRemov != bHigherIt && orderF(*bRemov) < dO; ++bRemov); // keep bRemov inside the disk
-	    for (; aAdd != asIterEnd && orderF(*aAdd) <= dO; ++aAdd); // keep aAdd outside the disk
-	    for (; bAdd != bsIterEnd && orderF(*bAdd) <= dO; ++bAdd); // keep bAdd outside the disk
-	    double b_hat = (bAdd - bRemov + bCount) / static_cast<double>(bsEnd - bsBegin);
-	    double a_hat = (aAdd - aRemov + aCount) / static_cast<double>(asEnd - asBegin);
+
+	  fill(aCountsR.begin(), aCountsR.end(), 0);
+	  fill(bCountsR.begin(), bCountsR.end(), 0);
+	  fill(aCountsR.begin(), aCountsA.end(), 0);
+	  fill(bCountsA.begin(), bCountsA.end(), 0);
+	  
+	  partial_counts(asBegin, aHigherIt,
+			 netSampleSorted.begin(), nIterEnd,
+			 aCountsR, compF);
+	  aCount = aHigherIt - asBegin + aCount;
+	  partial_counts(bsBegin, bHigherIt,
+			 netSampleSorted.begin(), nIterEnd,
+			 bCountsR, compF);
+	  bCount = bHigherIt - bsBegin + bCount;
+	  partial_counts(aHigherIt, asIterEnd,
+			 netSampleSorted.begin(), nIterEnd,
+			 aCountsA, compF);
+	  partial_counts(bHigherIt, bsIterEnd,
+			 netSampleSorted.begin(), nIterEnd,
+			 bCountsA, compF);
+	  auto size = nIterEnd - netSampleSorted.begin();
+	  for (int k = 0; k < size; k++) {
+	    aCount += aCountsA[k] - aCountsR[k];
+	    bCount += bCountsA[k] - bCountsR[k];	    
+	    double b_hat = bCount / static_cast<double>(bsEnd - bsBegin);
+	    double a_hat = aCount / static_cast<double>(asEnd - asBegin);
+	    
 	    //This is not conservative at all
 	    double eps = 2 / static_cast<double>(nEnd - nBegin);
 	    if (rhoInRange(a_hat, b_hat, rho, eps)) {
-	      Disk currDisk(*i, *j, *k);
-	      currDisk.setNumAnomalies(aAdd - aRemov + aCount, asEnd - asBegin);
-	      currDisk.setNumPoints(bAdd - bRemov + bCount, bsEnd - bsBegin);
+	      Disk currDisk(*i, *j, netSampleSorted[k]);
+	      currDisk.setNumAnomalies(aCount, asEnd - asBegin);
+	      currDisk.setNumPoints(bCount, bsEnd - bsBegin);
 	      if (currMax.statistic() <= currDisk.statistic()) {
 		currMax = currDisk;
 	      }

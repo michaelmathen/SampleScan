@@ -10,6 +10,18 @@
 #include <boost/algorithm/string.hpp>
 namespace anomaly {
 
+
+  template <typename T, typename L, typename C>
+  inline void partial_counts(T begin, T end,
+			     T break_begin, T break_end, // Assumed to be sorted
+			     vector<int>& counts,
+			     C const& compF) {
+    //Partitions based on the break points.
+    for (; begin != end; begin++) {
+      auto lb = lower_bound(break_begin, break_end, compF);
+      counts[lb - break_begin] += 1;
+    }
+  }
   
   inline bool rhoInRange(double m, double b, double rho, double eps) {
     double alpha = exp(- 1 / rho);
