@@ -4,7 +4,7 @@ boost.python
 python 2.7
 scons
 
-#Instructions for OSX
+#Instructions for OSX 
 Assuming you have brew installed:
 ```
 > brew install python
@@ -22,7 +22,7 @@ build/release/pywrapper directory to your python path. So:
 ```
 You should then be able to use this library as a standard python module by doing:
 import eps_scan
-
+Linux instructions should be basically identical. (I have run this on arch linux and ubuntu)
 # Calling eps scan 
 Example code:
 ```
