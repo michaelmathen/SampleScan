@@ -1,3 +1,8 @@
+/* Copyright (C) University of Utah - All Rights Reserved
+ * Unauthorized copying of this file, via any medium is strictly prohibited
+ * Proprietary and confidential
+ * Written by Michael Matheny <michaelmathen@gmail.com>, 2015-2016
+ */
 #ifndef JEFF_ALGORITHM_MAIN
 #define JEFF_ALGORITHM_MAIN
 
