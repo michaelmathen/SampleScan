@@ -100,6 +100,20 @@ boost::python::object runJeff(boost::python::object const& ob, double eps) {
   return boost::python::object(alg(newV.begin(), newV.end(), eps));
 }
 
+inline anomaly::Disk make_disk3(anomaly::Point const& p1,
+				anomaly::Point const& p2,
+				anomaly::Point const& p3) {
+  return anomaly::Disk(p1, p2, p3);
+}
+
+inline anomaly::Disk make_disk2(anomaly::Point const& p1,
+				anomaly::Point const& p2) {
+  return anomaly::Disk(p1, p2);
+}
+
+inline anomaly::Disk make_disk1(anomaly::Point const& p1) {
+  return anomaly::Disk(p1);
+}
 
 BOOST_PYTHON_MODULE(eps_scan)
 {
@@ -108,6 +122,8 @@ BOOST_PYTHON_MODULE(eps_scan)
   class_<anomaly::Region, boost::noncopyable>("Region", no_init)
     .def("numAnomalies", &anomaly::Region::getNumAnomalies)
     .def("numPoints", &anomaly::Region::getNumPoints)
+    .def("setNumAnomalies", &anomaly::Region::setNumAnomalies)
+    .def("setNumPoints", &anomaly::Region::setNumPoints)
     .def("totalPoints", &anomaly::Region::getTotalPoints)
     .def("totalAnomalies", &anomaly::Region::getTotalAnomalies)
     .def("statistic", &anomaly::Region::statistic)
@@ -147,6 +163,10 @@ BOOST_PYTHON_MODULE(eps_scan)
   
   def("disk2", &disk2);
   def("disk3", &disk3);
+
+  def("makeDisk1", &make_disk1);
+  def("makeDisk2", &make_disk2);
+  def("makeDisk3", &make_disk3);
   
   def("netDisks", runAlg<anomaly::AllDisks, int, int, double>);
   //def("netRects", runAlg<anomaly::RectangleScan, int, int, double>);

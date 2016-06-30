@@ -102,7 +102,7 @@ namespace anomaly {
 	  fill(bCountsR.begin(), bCountsR.end(), 0);
 	  fill(aCountsA.begin(), aCountsA.end(), 0);
 	  fill(bCountsA.begin(), bCountsA.end(), 0);
-
+	  /*Probably most of the time is spent here*/
 	  partial_counts(asBegin, aHigherIt,
 			 netSampleSorted.begin(), nIterEnd,
 			 aCountsR, compF);
@@ -117,6 +117,8 @@ namespace anomaly {
 	  partial_counts(bHigherIt, bsIterEnd,
 			 netSampleSorted.begin(), nIterEnd,
 			 bCountsA, compF);
+	  /*----------------------------------------------*/
+	  
 	  auto size = nIterEnd - netSampleSorted.begin();
 	  for (int k = 0; k < size; k++) {
 	    aCount += aCountsA[k] - aCountsR[k];
@@ -125,14 +127,11 @@ namespace anomaly {
 	    double a_hat = aCount / static_cast<double>(asEnd - asBegin);
 	    
 	    //This is not conservative at all
-	    double eps = 2 / static_cast<double>(nEnd - nBegin);
-	    if (rhoInRange(a_hat, b_hat, rho, eps)) {
-	      Disk currDisk(*i, *j, netSampleSorted[k]);
-	      currDisk.setNumAnomalies(aCount, asEnd - asBegin);
-	      currDisk.setNumPoints(bCount, bsEnd - bsBegin);
-	      if (currMax.statistic() <= currDisk.statistic()) {
-		currMax = currDisk;
-	      }
+	    Disk currDisk(*i, *j, netSampleSorted[k]);
+	    currDisk.setNumAnomalies(aCount, asEnd - asBegin);
+	    currDisk.setNumPoints(bCount, bsEnd - bsBegin);
+	    if (currMax.statistic() <= currDisk.statistic()) {
+	      currMax = currDisk;
 	    }
 	  }
 	}
