@@ -11,14 +11,14 @@
 namespace anomaly {
 
 
-  template <typename T, typename L, typename C>
+  template <typename T, typename C>
   inline void partial_counts(T begin, T end,
 			     T break_begin, T break_end, // Assumed to be sorted
 			     vector<int>& counts,
-			     C const& compF) {
+			     C compF) {
     //Partitions based on the break points.
     for (; begin != end; begin++) {
-      auto lb = lower_bound(break_begin, break_end, compF);
+      auto lb = lower_bound(break_begin, break_end, *begin, compF);
       counts[lb - break_begin] += 1;
     }
   }

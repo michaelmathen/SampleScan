@@ -67,8 +67,9 @@ boost::python::object runAlgSample(boost::python::object const& n,
   std::vector<anomaly::Point> sa_pts(begin_sa, end_sa);
   std::vector<anomaly::Point> sb_pts(begin_sb, end_sb);  
   T alg;
-  return boost::python::object(alg.run(n_pts.begin(), n_pts.end(), sa_pts.begin(),
-				       sa_pts.end(), sb_pts.begin(), sb_pts.end(),
+  return boost::python::object(alg.run(n_pts.begin(), n_pts.end(),
+				       sa_pts.begin(), sa_pts.end(),
+				       sb_pts.begin(), sb_pts.end(),
 				       rho));
 }
 

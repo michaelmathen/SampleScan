@@ -17,20 +17,18 @@ namespace anomaly {
     Disk operator()(RI nB, RI nE,
 		    int netSize,
 		    int sampleSize,
-		    double sigLevel,
 		    double rho) {
       vector<Point> netS;
       vector<Point> aS;
       vector<Point> bS;    
       dualSample(nB, nE, netS, aS, bS, netSize, sampleSize);
-      return run(netS.begin(), netS.end(), aS.begin(), aS.end(), bS.begin(), bS.end(), sigLevel, rho);
+      return run(netS.begin(), netS.end(), aS.begin(), aS.end(), bS.begin(), bS.end(), rho);
     }
     
     template <typename RI>
     Disk run(RI nB, RI nE,
 	     RI asBegin, RI asEnd,
 	     RI bsBegin, RI bsEnd,
-	     double sigLevel, //Return any item over this significance level
 	     double rho) {
 
       //Remove any duplicates.
@@ -102,9 +100,9 @@ namespace anomaly {
 
 	  fill(aCountsR.begin(), aCountsR.end(), 0);
 	  fill(bCountsR.begin(), bCountsR.end(), 0);
-	  fill(aCountsR.begin(), aCountsA.end(), 0);
+	  fill(aCountsA.begin(), aCountsA.end(), 0);
 	  fill(bCountsA.begin(), bCountsA.end(), 0);
-	  
+
 	  partial_counts(asBegin, aHigherIt,
 			 netSampleSorted.begin(), nIterEnd,
 			 aCountsR, compF);
