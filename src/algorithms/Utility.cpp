@@ -55,6 +55,23 @@ namespace anomaly {
     return (a11 * a22 - a12 * a21 == 0);
   }
 
+  double orderDisks(Point const& pt1,
+		Point const& pt2,
+		double ox,
+		double oy) {
+    /*
+      This isn't quite right
+     */
+    double x1, x2, y1, y2;
+    pt1.getLoc(x1, y1);
+    pt2.getLoc(x2, y2);
+    double u = y2 - y1;
+    double v = x1 - x2;
+    double norm = sqrt((u * u + v * v));
+    return (u * ox + v * oy) / norm;
+  }
+
+  
   bool onLineSegment(Point const& pt1,
 		     Point const& pt2,
 		     Point const& pt3) {

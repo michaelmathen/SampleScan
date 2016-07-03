@@ -54,6 +54,7 @@ namespace anomaly {
       vector<int> bCountsA(nEnd - nBegin, 0);
       vector<int> aCountsR(nEnd - nBegin, 0);
       vector<int> bCountsR(nEnd - nBegin, 0);
+      
       auto sortedB = netSampleSorted.begin();
       auto sortedEOuter = netSampleSorted.end();
       for (auto i = nBegin; i != nEnd - 2; i++) {
@@ -70,7 +71,14 @@ namespace anomaly {
 	  double cY = (i->getY() + j->getY()) / 2.0;
 	  
 	  auto isNotCol = [&i, &j](Point const& pt) {
-	    return !colinear(*i, *j, pt);
+	    double x1, x2, x3, y1, y2, y3;
+	    i->getLoc(x1, y1);
+	    j->getLoc(x2, y2);
+	    pt.getLoc(x3, y3);
+	    double
+	    a11 = x2 - x1, a12 = y2 - y1,
+	    a21 = x2 - x3, a22 = y2 - y3;
+	    return (a11 * a22 - a12 * a21 != 0);
 	  };
 	  
 	  // Partition these into a set of adding points and removing points
@@ -82,18 +90,12 @@ namespace anomaly {
 	    // If the point lines up with either of the reference
 	    // point then we take this to be a disk defined by only
 	    // the reference points.
-	    if (colinear(*i, *j, pt)){
-	      return numeric_limits<double>::infinity();
-	    } else {
-	      // We are projecting a vector created between
-	      //the disk center and center point between the two points.
-	      double a, b;
-	      solveCircle3(*i, *j, pt, a, b);
-	      return orthoX * (a - cX) + orthoY * (b - cY);
-	    }
-	    
+	    // We are projecting a vector created between
+	    //the disk center and center point between the two points.
+	    double a, b;
+	    solveCircle3(*i, *j, pt, a, b);
+	    return orthoX * (a - cX) + orthoY * (b - cY);
 	  };
-	  
 	  auto compF = [&orderF] (Point const& pt1, Point const& pt2) {
 	    return orderF(pt1) < orderF(pt2);
 	  };
@@ -103,10 +105,17 @@ namespace anomaly {
 
 	  auto asIterEnd = partition(asBegin, asEnd, isNotCol);
 	  auto bsIterEnd = partition(bsBegin, bsEnd, isNotCol);
+	  auto nIterEnd = partition(sortedB, sortedE, isNotCol);
+
 	  auto aCount = count_if(asIterEnd, asEnd, onLine);
 	  auto bCount = count_if(bsIterEnd, bsEnd, onLine);
-	  auto nIterEnd = partition(sortedB, sortedE, isNotCol);
-	  sort(netSampleSorted.begin(), nIterEnd, compF);
+
+	  sort(sortedB, nIterEnd, compF);
+	  vector<double> orderV;
+	  orderV.reserve(nIterEnd - sortedB);
+	  for (auto b = sortedB; b != nIterEnd; b++) {
+	    orderV.push_back(orderF(*b));
+	  }
 	  auto aHigherIt = partition(asBegin, asIterEnd, partitionF);
 	  auto bHigherIt = partition(bsBegin, bsIterEnd, partitionF);
 
@@ -116,19 +125,23 @@ namespace anomaly {
 	  fill(bCountsA.begin(), bCountsA.end(), 0);
 	  /*Probably most of the time is spent here*/
 	  partial_counts(asBegin, aHigherIt,
-			 sortedB, nIterEnd,
-			 aCountsR, compF);
+			 orderV,
+			 aCountsR,
+			 orderF);
 	  aCount = aHigherIt - asBegin + aCount;
 	  partial_counts(bsBegin, bHigherIt,
-			 sortedB, nIterEnd,
-			 bCountsR, compF);
+			 orderV,
+			 bCountsR,
+			 orderF);
 	  bCount = bHigherIt - bsBegin + bCount;
 	  partial_counts(aHigherIt, asIterEnd,
-			 sortedB, nIterEnd,
-			 aCountsA, compF);
+			 orderV,
+			 aCountsA,
+			 orderF);
 	  partial_counts(bHigherIt, bsIterEnd,
-			 sortedB, nIterEnd,
-			 bCountsA, compF);
+			 orderV,
+			 bCountsA,
+			 orderF);
 	  /*----------------------------------------------*/
 	  
 	  auto size = nIterEnd - sortedB;

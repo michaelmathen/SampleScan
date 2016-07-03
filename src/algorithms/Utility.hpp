@@ -16,17 +16,22 @@
 namespace anomaly {
 
 
-  template <typename T, typename C>
+  template <typename T, typename F>
   inline void partial_counts(T begin, T end,
-			     T break_begin, T break_end, // Assumed to be sorted
+			     vector<double> const& partitions,
 			     vector<int>& counts,
-			     C compF) {
+			     F orderF) {
     //Partitions based on the break points.
     for (; begin != end; begin++) {
-      auto lb = lower_bound(break_begin, break_end, *begin, compF);
-      counts[lb - break_begin] += 1;
+      auto lb = lower_bound(partitions.begin(), partitions.end(), orderF(*begin));
+      counts[lb - partitions.begin()] += 1;
     }
   }
+
+  double orderDisks(Point const& pt1,
+		    Point const& pt2,
+		    double ox,
+		    double oy);
   
   inline bool rhoInRange(double m, double b, double rho, double eps) {
     double alpha = exp(- 1 / rho);

@@ -17,17 +17,18 @@ int main() {
   vector<Point> testSampleA;
   vector<Point> testSampleB;
 
+
   for (int i = 0; i < 100; i++) {
     Point pt(udist(generator), udist(generator));
     testNet.push_back(pt);
   }
 
-  for (int i = 0; i < 4000; i++) {
+  for (int i = 0; i < 8000; i++) {
     Point pt(udist(generator), udist(generator));
     testSampleA.push_back(pt);
   }
 
-  for (int i = 0; i < 4000; i++) {
+  for (int i = 0; i < 8000; i++) {
     Point pt(udist(generator), udist(generator));
     testSampleB.push_back(pt);
   }
@@ -35,4 +36,5 @@ int main() {
 			  testSampleA.begin(), testSampleA.end(),
 			  testSampleB.begin(), testSampleB.end(), .001);
   cout << reg << endl;
+  return 0;
 }
