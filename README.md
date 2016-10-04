@@ -2,9 +2,10 @@
 This is a python wrapper around several anomaly detection algorithms written in c++. These algorithms are from the paper 
 Scalable Spatial Scan Statistics through Sampling.
 To compile this you will need:
-boost.python
-python 2.7
-scons
+
+* boost.python
+* python 2.7
+* scons
 
 #Instructions for OSX 
 Assuming you have brew installed:
