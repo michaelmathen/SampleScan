@@ -1,4 +1,4 @@
-# epsscan
+# SampleScan
 This is a python wrapper around several anomaly detection algorithms written in c++. To compile this you will need:
 boost.python
 python 2.7
