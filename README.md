@@ -1,5 +1,7 @@
 # SampleScan
-This is a python wrapper around several anomaly detection algorithms written in c++. To compile this you will need:
+This is a python wrapper around several anomaly detection algorithms written in c++. These algorithms are from the paper 
+Scalable Spatial Scan Statistics through Sampling.
+To compile this you will need:
 boost.python
 python 2.7
 scons
